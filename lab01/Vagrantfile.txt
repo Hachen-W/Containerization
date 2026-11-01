@@ -1,0 +1,66 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "cloud-image/debian-13"
+  config.vm.box_check_update = false
+
+  config.vm.define "vm1" do |vm1|
+    vm1.vm.hostname = "vm1"
+
+    vm1.vm.provider "virtualbox" do |vb|
+      vb.name = "vm1"
+    end
+
+    vm1.vm.network "forwarded_port", guest: 80, host: 8080
+    vm1.vm.network "private_network", ip: "172.20.0.11", netmask: "255.255.255.0"
+
+    vm1.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get upgrade -y
+      apt-get install -y nginx
+      systemctl enable --now nginx
+    SHELL
+  end
+
+  config.vm.define "vm2" do |vm2|
+    vm2.vm.hostname = "vm2"
+    vm2.vm.disk :disk, size: "30GB", primary: true
+
+    vm2.vm.provider "virtualbox" do |vb|
+      vb.name = "vm2"
+    end
+
+    vm2.vm.network "public_network"
+
+    vm2.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get upgrade -y
+      apt-get install -y ca-certificates curl gnupg lsb-release
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      systemctl enable --now docker
+    SHELL
+  end
+
+  config.vm.define "vm3" do |vm3|
+    vm3.vm.hostname = "vm3"
+
+    vm3.vm.provider "virtualbox" do |vb|
+      vb.name = "vm3"
+    end
+
+    vm3.vm.network "private_network", ip: "172.20.0.13", netmask: "255.255.255.0"
+
+    vm3.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get upgrade -y
+      apt-get install -y zsh sudo
+      groupadd -f adam
+      id -u adam &>/dev/null || useradd -m -d /home/adam -s /bin/zsh -g adam adam
+      echo "adam ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/adam
+      chmod 0440 /etc/sudoers.d/adam
+    SHELL
+  end
+end
